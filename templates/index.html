@@ -4,187 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Monitor</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
         .stats { margin: 20px; }
-        canvas { margin: 20px auto; display: block; }
-        .chart-container { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; }
-        .chart-wrapper { width: 400px; height: 200px; }
-        .temperature-bar, .fan-speedometer { margin: 20px auto; width: 400px; }
     </style>
 </head>
 <body>
     <h1>System Monitor</h1>
     <div id="stats">
-        <p>CPU Usage (Overall): <span id="cpu">--</span>%</p>
+        <p>CPU Usage: <span id="cpu">--</span>%</p>
         <p>Memory Usage: <span id="memory">--</span>%</p>
         <p>Disk Usage: <span id="disk">--</span>%</p>
-        <p>CPU Temperature: <span id="temperature">--</span>°C</p>
-        <p>Fan Speed: <span id="fanSpeed">--</span> RPM</p>
-    </div>
-    <div class="chart-container">
-        <div class="chart-wrapper"><canvas id="cpuCore1Chart"></canvas></div>
-        <div class="chart-wrapper"><canvas id="cpuCore2Chart"></canvas></div>
-        <div class="chart-wrapper"><canvas id="cpuCore3Chart"></canvas></div>
-        <div class="chart-wrapper"><canvas id="cpuCore4Chart"></canvas></div>
-        <div class="chart-wrapper"><canvas id="virtualMemoryChart"></canvas></div>
-        <div class="chart-wrapper" style="width: 300px; height: 300px;"><canvas id="diskPieChart"></canvas></div>
-        <div class="chart-wrapper"><canvas id="temperatureBar"></canvas></div>
-        <div class="chart-wrapper" style="width: 300px; height: 300px;"><canvas id="fanSpeedometer"></canvas></div>
     </div>
     <script>
-        // Initialize charts for each CPU core
-        const createLineChart = (ctx, label) => new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: label,
-                    data: [],
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Usage (%)'
-                        },
-                        min: 0,
-                        max: 100
-                    }
-                }
-            }
-        });
-
-        const createPieChart = (ctx, label) => new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: ['Used', 'Free'],
-                datasets: [{
-                    label: label,
-                    data: [0, 0],
-                    backgroundColor: ['rgba(255, 99, 132, 0.6)', 'rgba(54, 162, 235, 0.6)']
-                }]
-            },
-            options: {
-                responsive: true,
-            }
-        });
-
-        const createBarChart = (ctx, label) => new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Temperature'],
-                datasets: [{
-                    label: label,
-                    data: [0],
-                    backgroundColor: 'rgba(255, 159, 64, 0.6)',
-                    borderColor: 'rgba(255, 159, 64, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        min: 0,
-                        max: 100
-                    }
-                }
-            }
-        });
-
-        const createGaugeChart = (ctx, label) => new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Fan Speed'],
-                datasets: [{
-                    label: label,
-                    data: [0, 1000], // Initial data, max RPM can be adjusted
-                    backgroundColor: ['rgba(54, 162, 235, 0.6)', 'rgba(211, 211, 211, 0.3)'],
-                    rotation: -Math.PI,
-                    circumference: Math.PI
-                }]
-            },
-            options: {
-                responsive: true,
-                rotation: -Math.PI,
-                circumference: Math.PI,
-                plugins: {
-                    tooltip: {
-                        enabled: false
-                    }
-                }
-            }
-        });
-
-        const cpuCore1Chart = createLineChart(document.getElementById('cpuCore1Chart').getContext('2d'), 'CPU Core 1 Usage (%)');
-        const cpuCore2Chart = createLineChart(document.getElementById('cpuCore2Chart').getContext('2d'), 'CPU Core 2 Usage (%)');
-        const cpuCore3Chart = createLineChart(document.getElementById('cpuCore3Chart').getContext('2d'), 'CPU Core 3 Usage (%)');
-        const cpuCore4Chart = createLineChart(document.getElementById('cpuCore4Chart').getContext('2d'), 'CPU Core 4 Usage (%)');
-        const virtualMemoryChart = createLineChart(document.getElementById('virtualMemoryChart').getContext('2d'), 'Virtual Memory Usage (%)');
-        const diskPieChart = createPieChart(document.getElementById('diskPieChart').getContext('2d'), 'Disk Usage');
-        const temperatureBar = createBarChart(document.getElementById('temperatureBar').getContext('2d'), 'CPU Temperature (°C)');
-        const fanSpeedometer = createGaugeChart(document.getElementById('fanSpeedometer').getContext('2d'), 'Fan Speed (RPM)');
-
         async function fetchStats() {
             const response = await fetch('/api/stats');
             const data = await response.json();
-
-            // Update text stats
             document.getElementById('cpu').textContent = data.cpu;
             document.getElementById('memory').textContent = data.memory;
             document.getElementById('disk').textContent = data.disk;
-            document.getElementById('temperature').textContent = data.cpu_temp || '--';
-            document.getElementById('fanSpeed').textContent = data.fan_speed || '--';
-
-            const now = new Date().toLocaleTimeString();
-
-            // Update line charts
-            const updateLineChart = (chart, usage) => {
-                chart.data.labels.push(now);
-                chart.data.datasets[0].data.push(usage);
-                if (chart.data.labels.length > 20) {
-                    chart.data.labels.shift();
-                    chart.data.datasets[0].data.shift();
-                }
-                chart.update();
-            };
-
-            updateLineChart(cpuCore1Chart, data.cpu[0]);
-            updateLineChart(cpuCore2Chart, data.cpu[1]);
-            updateLineChart(cpuCore3Chart, data.cpu[2]);
-            updateLineChart(cpuCore4Chart, data.cpu[3]);
-            updateLineChart(virtualMemoryChart, data.memory);
-
-            // Update bar chart for temperature
-            temperatureBar.data.datasets[0].data[0] = data.cpu_temp || 0;
-            temperatureBar.update();
-
-            // Update gauge chart for fan speed
-            fanSpeedometer.data.datasets[0].data[0] = data.fan_speed || 0;
-            fanSpeedometer.data.datasets[0].data[1] = 1000 - (data.fan_speed || 0); // Adjust max RPM as needed
-            fanSpeedometer.update();
-
-            // Update pie chart for disk usage
-            diskPieChart.data.datasets[0].data = [data.disk, 100 - data.disk];
-            diskPieChart.update();
         }
-
-        setInterval(fetchStats, 10000); // Refresh every 10 seconds
+        setInterval(fetchStats, 2000); // Refresh every 2 seconds
         fetchStats();
     </script>
 </body>
