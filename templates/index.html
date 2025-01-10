@@ -6,25 +6,136 @@
     <title>System Monitor</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
-        .stats { margin: 20px; }
+        .chart-container { width: 80%; margin: 20px auto; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <h1>System Monitor</h1>
-    <div id="stats">
-        <p>CPU Usage: <span id="cpu">--</span>%</p>
-        <p>Memory Usage: <span id="memory">--</span>%</p>
-        <p>Disk Usage: <span id="disk">--</span>%</p>
+
+    <div class="chart-container">
+        <canvas id="cpuChart"></canvas>
     </div>
+    <div class="chart-container">
+        <canvas id="memoryChart"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="diskChart"></canvas>
+    </div>
+
+    <div id="processList">
+        <h3>Top Processes</h3>
+        <ul id="processes"></ul>
+    </div>
+
     <script>
+        const cpuData = [];
+        const memoryData = [];
+        const diskData = { used: 0, free: 0 };
+        const maxDataPoints = 10;
+
+        const cpuChartCtx = document.getElementById('cpuChart').getContext('2d');
+        const memoryChartCtx = document.getElementById('memoryChart').getContext('2d');
+        const diskChartCtx = document.getElementById('diskChart').getContext('2d');
+
+        const cpuChart = new Chart(cpuChartCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CPU Usage (%)',
+                    data: cpuData,
+                    borderColor: 'red',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Time' } },
+                    y: { title: { display: true, text: 'Usage (%)' }, beginAtZero: true, max: 100 }
+                }
+            }
+        });
+
+        const memoryChart = new Chart(memoryChartCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Memory Usage (%)',
+                    data: memoryData,
+                    borderColor: 'blue',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Time' } },
+                    y: { title: { display: true, text: 'Usage (%)' }, beginAtZero: true, max: 100 }
+                }
+            }
+        });
+
+        const diskChart = new Chart(diskChartCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Used', 'Free'],
+                datasets: [{
+                    data: [diskData.used, diskData.free],
+                    backgroundColor: ['orange', 'green']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+
         async function fetchStats() {
             const response = await fetch('/api/stats');
             const data = await response.json();
-            document.getElementById('cpu').textContent = data.cpu;
-            document.getElementById('memory').textContent = data.memory;
-            document.getElementById('disk').textContent = data.disk;
+
+            // Update CPU and Memory Charts
+            const timestamp = new Date().toLocaleTimeString();
+            if (cpuData.length >= maxDataPoints) cpuData.shift();
+            if (memoryData.length >= maxDataPoints) memoryData.shift();
+
+            cpuData.push(data.cpu);
+            memoryData.push(data.memory);
+            cpuChart.data.labels.push(timestamp);
+            memoryChart.data.labels.push(timestamp);
+
+            if (cpuChart.data.labels.length > maxDataPoints) {
+                cpuChart.data.labels.shift();
+                memoryChart.data.labels.shift();
+            }
+
+            cpuChart.update();
+            memoryChart.update();
+
+            // Update Disk Chart
+            diskData.used = data.disk.used;
+            diskData.free = data.disk.free;
+            diskChart.data.datasets[0].data = [diskData.used, diskData.free];
+            diskChart.update();
+
+            // Update Process List
+            const processesList = document.getElementById('processes');
+            processesList.innerHTML = '';
+            data.processes.forEach(proc => {
+                const listItem = document.createElement('li');
+                listItem.textContent = `PID: ${proc.pid}, Name: ${proc.name}, CPU: ${proc.cpu_percent}%`;
+                processesList.appendChild(listItem);
+            });
         }
-        setInterval(fetchStats, 2000); // Refresh every 2 seconds
+
+        setInterval(fetchStats, 500); // Refresh every 0.5 seconds
         fetchStats();
     </script>
 </body>
